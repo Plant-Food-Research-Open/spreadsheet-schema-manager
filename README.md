@@ -30,7 +30,7 @@ structures or complex 2D matrix-style tables is not available at this stage.
 
 - [Rio](https://rio.dev/) — Python web app framework (UI and backend logic both live in Python)
 - MongoDB — persistence
-- MinIO / S3 — file storage
+- SeaweedFS (S3-compatible object storage) — file storage
 - Keycloak — SSO authentication (OpenID Connect)
 
 ## Getting started
@@ -39,7 +39,7 @@ structures or complex 2D matrix-style tables is not available at this stage.
 
 - Python 3.12+
 - A running MongoDB instance
-- A running MinIO/S3-compatible object store
+- A running SeaweedFS S3-compatible object store
 
 ### Install
 
@@ -64,8 +64,8 @@ The app is configured entirely via environment variables:
 | --- | --- |
 | `MONGO_INITDB_ROOT_USERNAME` / `MONGO_INITDB_ROOT_PASSWORD` | MongoDB credentials |
 | `MONGO_APP` / `MONGO_PORT` | MongoDB host / port |
-| `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY` | MinIO/S3 credentials |
-| `MINIO_URL` / `BUCKET_NAME` | MinIO/S3 endpoint and bucket |
+| `S3_ACCESS_KEY` / `S3_SECRET_KEY` | SeaweedFS/S3-compatible credentials |
+| `S3_URL` / `BUCKET_NAME` | SeaweedFS/S3 endpoint and bucket |
 | `AUTH_SECRET_KEY` / `AUTH_REDIRECT_URI` | Keycloak OAuth client secret and redirect URI |
 | `AUTH_DISABLED` | When `true`, bypasses Keycloak login and attaches a fresh, isolated synthetic user to every session. **Only use this in local dev, UAT, or test environments — never in production.** |
 | `TEST_USER_NAME` / `TEST_USER_EMAIL` | Display name/email used for the synthetic user when `AUTH_DISABLED=true` |
@@ -75,13 +75,29 @@ The app is configured entirely via environment variables:
 
 ## Deployment
 
-Kubernetes manifests for the `dev`, `uat`, and `prod` environments live under `deployment/`,
-deployed via ArgoCD. Notable jobs:
+The app is deployed with a Helm chart in `deployment/helm/ssm`, with environment-specific
+values overlays for `dev`, `uat`, and `prod`:
 
-- `deployment/prod/backup-cronjob.yml` — nightly MongoDB backup to NFS storage.
-- `deployment/uat/cleanup-cronjob.yml` — nightly UAT test-data wipe.
-- `deployment/dev/restore-cronjob.yml` — manually-triggered dev database restore from the latest
-  prod backup.
+- `deployment/helm/ssm/values.yaml` — shared defaults
+- `deployment/helm/ssm/values-dev.yaml` — dev settings
+- `deployment/helm/ssm/values-uat.yaml` — UAT settings
+- `deployment/helm/ssm/values-prod.yaml` — prod settings
+
+The chart deploys the Rio app together with MongoDB and an in-pod SeaweedFS S3-compatible
+object store, exposes the app through ingress, and provisions the required PVCs and secret/config
+maps. The `prod` overlay enables the object-store and backup jobs; the `restore`/`backup` jobs are
+configured as Kubernetes CronJobs for MongoDB and SeaweedFS bucket lifecycle maintenance.
+
+Example deploy pattern:
+
+```bash
+helm upgrade --install ssm ./deployment/helm/ssm \
+  -f ./deployment/helm/ssm/values.yaml \
+  -f ./deployment/helm/ssm/values-prod.yaml
+```
+
+This deployment is managed via ArgoCD in the cluster, but the source of truth is the Helm chart
+rather than legacy raw Kubernetes manifests.
 
 ## Testing
 
@@ -89,6 +105,21 @@ deployed via ArgoCD. Notable jobs:
 - End-to-end tests: see the companion `spreadsheet-schema-manager-rio-playwright-tests`
   repository.
 
+## Contributing
+
+Contributions are welcome. If you are planning a change, please open an issue or discussion first
+so the intended approach and scope are clear.
+
+When updating application behaviour, configuration, or deployment wiring, also update the relevant
+README or deployment documentation so the project remains easy to operate and understand.
+
 ## License
 
 Licensed under the Apache License, Version 2.0 — see [LICENSE](LICENSE) and [NOTICE](NOTICE) for details.
+
+## Funding
+
+Funded by the New Zealand Ministry of Business, Innovation and Employment Strategic Science
+Investment Fund (contract number C11X1702) as part of the Digital Horticulture Systems Ngā Pou
+Rangahau, a Growing Futures™ programme at The New Zealand Institute for Bioeconomy Science
+Limited (Bioeconomy Science Institute).
