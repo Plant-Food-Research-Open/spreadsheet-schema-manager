@@ -1,0 +1,24 @@
+image:
+  repository: containerhub.powerplant.pfr.co.nz/spreadsheet-schema-manager/spreadsheet-schema-manager-rio-prod
+
+ingress:
+  host: spreadsheet-schema-manager.dhs.k8s.pfr.co.nz
+
+s3:
+  bucketName: spreadsheet-schema-prod
+
+seaweedfs:
+  storage: 100Gi
+
+backup:
+  enabled: true
+
+backupS3:
+  enabled: true
+
+restore:
+  enabled: true
+  suspend: true
+
+restoreS3:
+  enabled: true

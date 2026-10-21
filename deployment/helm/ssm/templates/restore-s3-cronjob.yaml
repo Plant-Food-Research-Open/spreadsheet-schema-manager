@@ -1,0 +1,62 @@
+{{- if .Values.restoreS3.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "ssm.fullname" . }}-restore-s3
+  labels:
+    {{- include "ssm.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cron-restore-s3
+spec:
+  schedule: {{ .Values.restoreS3.schedule | quote }}
+  suspend: {{ .Values.restoreS3.suspend }}
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            {{- include "ssm.selectorLabels" . | nindent 12 }}
+        spec:
+          volumes:
+            - name: powerplant-workspace
+              nfs:
+                server: {{ .Values.restoreS3.nfs.server }}
+                path: {{ .Values.restoreS3.nfs.path }}
+                readOnly: true
+          containers:
+            - name: cron-restore-s3
+              image: amazon/aws-cli:latest
+              volumeMounts:
+                - name: powerplant-workspace
+                  mountPath: /backup
+                  readOnly: true
+              command: [ "/bin/sh", "-c" ]
+              envFrom:
+                - configMapRef:
+                    name: {{ include "ssm.fullname" . }}-s3-connection
+                - secretRef:
+                    name: {{ .Values.secrets.s3 }}
+              args:
+                - >
+                  export AWS_ACCESS_KEY_ID="$S3_ACCESS_KEY"
+
+                  export AWS_SECRET_ACCESS_KEY="$S3_SECRET_KEY"
+
+                  export AWS_DEFAULT_REGION="us-east-1"
+
+                  echo -e "Finding latest backup...\n"
+
+                  LATEST_BACKUP=$(ls -t /backup/s3-backup-*.tar.gz | head -n 1)
+
+                  echo -e "Restoring from $LATEST_BACKUP...\n"
+
+                  mkdir -p /tmp/s3-restore
+
+                  tar -xzf "$LATEST_BACKUP" -C /tmp/s3-restore
+
+                  aws --endpoint-url "http://{{ include "ssm.fullname" . }}:{{ .Values.ports.seaweedfs }}" s3 sync "/tmp/s3-restore/$BUCKET_NAME" "s3://$BUCKET_NAME"
+
+                  rm -rf /tmp/s3-restore
+
+                  echo -e "\nRestore completed.\n"
+          restartPolicy: OnFailure
+{{- end }}

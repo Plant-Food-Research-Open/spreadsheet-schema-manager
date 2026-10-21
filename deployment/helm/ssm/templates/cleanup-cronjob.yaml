@@ -1,0 +1,35 @@
+{{- if .Values.cleanup.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "ssm.fullname" . }}-cleanup
+  labels:
+    {{- include "ssm.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cron-cleanup
+spec:
+  schedule: {{ .Values.cleanup.schedule | quote }}
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            {{- include "ssm.selectorLabels" . | nindent 12 }}
+        spec:
+          containers:
+            - name: cron-cleanup
+              image: {{ .Values.mongodb.image.repository }}:{{ .Values.mongodb.image.tag }}
+              command: [ "/bin/sh", "-c" ]
+              envFrom:
+                - configMapRef:
+                    name: {{ include "ssm.fullname" . }}-mongodb-connection
+                - secretRef:
+                    name: {{ .Values.secrets.db }}
+              args:
+                - >
+                  echo -e "Clearing UAT test data...\n"
+
+                  mongosh "mongodb://$MONGO_INITDB_ROOT_USERNAME:$MONGO_INITDB_ROOT_PASSWORD@$MONGO_APP:$MONGO_PORT/" --quiet --eval 'db = db.getSiblingDB("spreadsheet-schema"); ["fields","templates","workbooks","datasets","users","teams"].forEach(c => { const r = db[c].deleteMany({}); print(c + ": deleted " + r.deletedCount + " documents"); });'
+
+                  echo -e "\nCleanup completed.\n"
+          restartPolicy: OnFailure
+{{- end }}

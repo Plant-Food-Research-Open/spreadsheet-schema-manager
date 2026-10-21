@@ -1,0 +1,9 @@
+header,group,type,desc,ref,trait,unit,method,item_header,item_desc,item_param,item_value
+test1,,Category,,,,,,,,,
+,,,,,,,,h1,d1,,
+,,,,,,,,h2,d2,,
+test2,,Measurement,,,1,2,3,,,,
+,,,,,,,,,,p1,v1
+,,,,,,,,,,p2,v2
+,,,,,,,,,,p3,v3
+test3,group,Text,desc,ref,,,,,,,

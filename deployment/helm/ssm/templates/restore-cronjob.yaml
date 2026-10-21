@@ -1,0 +1,56 @@
+{{- if .Values.restore.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "ssm.fullname" . }}-restore
+  labels:
+    {{- include "ssm.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cron-restore
+spec:
+  schedule: {{ .Values.restore.schedule | quote }}
+  suspend: {{ .Values.restore.suspend }}
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            {{- include "ssm.selectorLabels" . | nindent 12 }}
+        spec:
+          volumes:
+            - name: powerplant-workspace
+              nfs:
+                server: {{ .Values.restore.nfs.server }}
+                path: {{ .Values.restore.nfs.path }}
+                readOnly: true
+          containers:
+            - name: cron-restore
+              image: {{ .Values.mongodb.image.repository }}:{{ .Values.mongodb.image.tag }}
+              volumeMounts:
+                - name: powerplant-workspace
+                  mountPath: /backup
+                  readOnly: true
+              command: [ "/bin/sh", "-c" ]
+              envFrom:
+                - configMapRef:
+                    name: {{ include "ssm.fullname" . }}-mongodb-connection
+                - secretRef:
+                    name: {{ .Values.secrets.db }}
+              args:
+                - >
+                  echo -e "Finding latest backup...\n"
+
+                  LATEST_BACKUP=$(ls -t /backup/mongodb-dump-* | head -n 1)
+
+                  echo -e "Restoring from $LATEST_BACKUP (drops and replaces existing collections)...\n"
+
+                  mongorestore --uri="mongodb://$MONGO_INITDB_ROOT_USERNAME:$MONGO_INITDB_ROOT_PASSWORD@$MONGO_APP:$MONGO_PORT/" --archive="$LATEST_BACKUP" --drop
+
+                  echo -e "\nRestore completed.\n"
+
+                  echo -e "Recreating indexes...\n"
+
+                  mongosh "mongodb://$MONGO_INITDB_ROOT_USERNAME:$MONGO_INITDB_ROOT_PASSWORD@$MONGO_APP:$MONGO_PORT/" --quiet --eval 'db = db.getSiblingDB("spreadsheet-schema"); db.fields.createIndex({owner_id:1,scope:1,header:1}); db.templates.createIndex({owner_id:1,scope:1,name:1}); db.workbooks.createIndex({owner_id:1,scope:1,name:1}); db.datasets.createIndex({owner_id:1,scope:1,creator_id:1,name:1}); db.users.createIndex({email:1},{unique:true});'
+
+                  echo -e "\nIndexes created.\n"
+          restartPolicy: OnFailure
+{{- end }}

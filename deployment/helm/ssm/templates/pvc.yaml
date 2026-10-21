@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: vol-{{ include "ssm.fullname" . }}-mongodb
+  labels:
+    {{- include "ssm.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/resource-policy": "keep"
+spec:
+  storageClassName: {{ .Values.mongodb.storageClassName }}
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.mongodb.storage }}
+{{- if .Values.seaweedfs.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: vol-{{ include "ssm.fullname" . }}-seaweedfs
+  labels:
+    {{- include "ssm.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/resource-policy": "keep"
+spec:
+  storageClassName: {{ .Values.seaweedfs.storageClassName }}
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.seaweedfs.storage }}
+{{- end }}

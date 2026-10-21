@@ -1,0 +1,5 @@
+header,group,type,desc,ref,trait,unit,method,item_param,item_value
+test,,Measurement,,,1,2,3,,
+,,,,,,,,p1,v1
+,,,,,,,,p2,v2
+,,,,,,,,p3,v3

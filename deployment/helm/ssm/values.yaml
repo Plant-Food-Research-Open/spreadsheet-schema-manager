@@ -1,0 +1,96 @@
+nameOverride: ""
+fullnameOverride: "spreadsheet-schema-manager"
+
+image:
+  repository: containerhub.powerplant.pfr.co.nz/spreadsheet-schema-manager/spreadsheet-schema-manager-rio-prod
+  tag: latest
+  pullPolicy: Always
+
+replicas: 1
+
+ports:
+  app: 8000
+  mongodb: 27017
+  seaweedfs: 8333
+
+mongodb:
+  image:
+    repository: mongo
+    tag: 8.3.4-noble
+  storage: 100M
+  storageClassName: kubernetes-nfs
+
+ingress:
+  host: spreadsheet-schema-manager.dhs.k8s.pfr.co.nz
+  tlsSecretName: ssm-tls-secret
+  proxyBodySize: 200M
+
+auth:
+  redirectPath: /login
+  disabled: false
+
+s3:
+  url: http://spreadsheet-schema-manager:8333
+  bucketName: spreadsheet-schema-prod
+
+# In-pod SeaweedFS S3 gateway.
+seaweedfs:
+  enabled: true
+  image:
+    repository: chrislusf/seaweedfs
+    tag: "4.44"
+  storage: 100M
+  storageClassName: kubernetes-nfs
+
+# Secrets are managed outside this chart (ArgoCD / manually created).
+# Only their names are referenced here.
+secrets:
+  db: db-secret
+  s3: s3-secret
+  auth: auth-secret
+  extra: [] # e.g. ["test-secret"] for uat
+
+resources: {}
+
+backup:
+  enabled: false
+  schedule: "30 2 * * *"
+  nfs:
+    server: storage.powerplant.pfr.co.nz
+    path: /ifs/linux/prod/powerplant/workspace/projects/spreadsheet-schema
+
+restore:
+  enabled: false
+  suspend: true
+  schedule: "0 3 * * *"
+  nfs:
+    server: storage.powerplant.pfr.co.nz
+    path: /ifs/linux/prod/powerplant/workspace/projects/spreadsheet-schema
+
+cleanup:
+  enabled: false
+  schedule: "0 3 * * *"
+
+cleanupS3:
+  enabled: false
+  schedule: "0 3 * * *"
+
+# Manually-triggered only (suspend: true always) — mirrors the seaweedfs
+# bucket to the same NFS path used for the mongodb backups.
+backupS3:
+  enabled: false
+  suspend: true
+  schedule: "45 2 * * *"
+  nfs:
+    server: storage.powerplant.pfr.co.nz
+    path: /ifs/linux/prod/powerplant/workspace/projects/spreadsheet-schema
+
+# Manually-triggered only (suspend: true always) — restores the latest
+# backupS3 archive back into the seaweedfs bucket.
+restoreS3:
+  enabled: false
+  suspend: true
+  schedule: "15 3 * * *"
+  nfs:
+    server: storage.powerplant.pfr.co.nz
+    path: /ifs/linux/prod/powerplant/workspace/projects/spreadsheet-schema

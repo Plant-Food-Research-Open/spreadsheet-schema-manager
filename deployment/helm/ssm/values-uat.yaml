@@ -1,0 +1,25 @@
+image:
+  repository: containerhub.powerplant.pfr.co.nz/spreadsheet-schema-manager/spreadsheet-schema-manager-rio-uat
+
+ingress:
+  host: spreadsheet-schema-manager.uat.k8s.pfr.co.nz
+
+s3:
+  bucketName: spreadsheet-schema-uat
+
+auth:
+  disabled: true
+
+secrets:
+  extra:
+    - test-secret
+
+restore:
+  enabled: true
+  suspend: true
+
+cleanup:
+  enabled: true
+
+cleanupS3:
+  enabled: true

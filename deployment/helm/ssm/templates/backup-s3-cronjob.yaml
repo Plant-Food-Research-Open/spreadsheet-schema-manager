@@ -1,0 +1,62 @@
+{{- if .Values.backupS3.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "ssm.fullname" . }}-backup-s3
+  labels:
+    {{- include "ssm.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cron-backup-s3
+spec:
+  schedule: {{ .Values.backupS3.schedule | quote }}
+  suspend: {{ .Values.backupS3.suspend }}
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            {{- include "ssm.selectorLabels" . | nindent 12 }}
+        spec:
+          volumes:
+            - name: powerplant-workspace
+              nfs:
+                server: {{ .Values.backupS3.nfs.server }}
+                path: {{ .Values.backupS3.nfs.path }}
+          containers:
+            - name: cron-backup-s3
+              image: amazon/aws-cli:latest
+              volumeMounts:
+                - name: powerplant-workspace
+                  mountPath: /backup
+              command: [ "/bin/sh", "-c" ]
+              envFrom:
+                - configMapRef:
+                    name: {{ include "ssm.fullname" . }}-s3-connection
+                - secretRef:
+                    name: {{ .Values.secrets.s3 }}
+              args:
+                - >
+                  export AWS_ACCESS_KEY_ID="$S3_ACCESS_KEY"
+
+                  export AWS_SECRET_ACCESS_KEY="$S3_SECRET_KEY"
+
+                  export AWS_DEFAULT_REGION="us-east-1"
+
+                  echo -e "Running S3 backup...\n"
+
+                  mkdir -p "/tmp/s3-backup/$BUCKET_NAME"
+
+                  aws --endpoint-url "http://{{ include "ssm.fullname" . }}:{{ .Values.ports.seaweedfs }}" s3 sync "s3://$BUCKET_NAME" "/tmp/s3-backup/$BUCKET_NAME"
+
+                  tar -czf "/backup/s3-backup-$(date -I).tar.gz" -C /tmp/s3-backup "$BUCKET_NAME"
+
+                  rm -rf /tmp/s3-backup
+
+                  echo -e "\nBackup completed.\n"
+
+                  echo -e "Cleaning up backups older than 14 days...\n"
+
+                  find /backup -type f -name "s3-backup-*.tar.gz" -mtime +14 -exec rm {} \;
+
+                  echo -e "Old backups removed.\n"
+          restartPolicy: OnFailure
+{{- end }}

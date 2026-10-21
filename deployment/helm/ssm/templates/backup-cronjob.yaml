@@ -1,0 +1,51 @@
+{{- if .Values.backup.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "ssm.fullname" . }}-backup
+  labels:
+    {{- include "ssm.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cron-backup
+spec:
+  schedule: {{ .Values.backup.schedule | quote }}
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            {{- include "ssm.selectorLabels" . | nindent 12 }}
+        spec:
+          volumes:
+            - name: powerplant-workspace
+              nfs:
+                server: {{ .Values.backup.nfs.server }}
+                path: {{ .Values.backup.nfs.path }}
+          containers:
+            - name: cron-backup
+              image: alpine:latest
+              volumeMounts:
+                - name: powerplant-workspace
+                  mountPath: /backup
+              command: [ "/bin/sh", "-c" ]
+              envFrom:
+                - configMapRef:
+                    name: {{ include "ssm.fullname" . }}-mongodb-connection
+                - secretRef:
+                    name: {{ .Values.secrets.db }}
+              args:
+                - >
+                  apk update && apk add tzdata mongodb-tools
+
+                  echo -e "Running backup...\n"
+
+                  mongodump --uri="mongodb://$MONGO_INITDB_ROOT_USERNAME:$MONGO_INITDB_ROOT_PASSWORD@$MONGO_APP:$MONGO_PORT/" --archive=/backup/mongodb-dump-$(date -I)
+
+                  echo -e "\nBackup completed.\n"
+
+                  echo -e "Cleaning up backups older than 14 days...\n"
+
+                  find /backup -type f -name "mongodb-dump-*" -mtime +14 -exec rm {} \;
+
+                  echo -e "Old backups removed.\n"
+          restartPolicy: OnFailure
+{{- end }}

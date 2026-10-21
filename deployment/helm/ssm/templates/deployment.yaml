@@ -1,0 +1,96 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ssm.fullname" . }}
+  labels:
+    {{- include "ssm.labels" . | nindent 4 }}
+  annotations:
+    # Lets ArgoCD delete+recreate this Deployment instead of failing with
+    # "field is immutable" when the pod-selector labels change (e.g. the
+    # raw-manifest -> Helm cutover). See templates/README.md.
+    argocd.argoproj.io/sync-options: Replace=true
+spec:
+  replicas: {{ .Values.replicas }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "ssm.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "ssm.labels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: spreadsheet-schema-manager
+          image: {{ include "ssm.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.ports.app }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "ssm.fullname" . }}-mongodb-connection
+            - configMapRef:
+                name: {{ include "ssm.fullname" . }}-s3-connection
+            - configMapRef:
+                name: {{ include "ssm.fullname" . }}-auth
+            - secretRef:
+                name: {{ .Values.secrets.db }}
+            - secretRef:
+                name: {{ .Values.secrets.s3 }}
+            - secretRef:
+                name: {{ .Values.secrets.auth }}
+            {{- range .Values.secrets.extra }}
+            - secretRef:
+                name: {{ . }}
+            {{- end }}
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+        - name: mongodb
+          image: {{ .Values.mongodb.image.repository }}:{{ .Values.mongodb.image.tag }}
+          ports:
+            - containerPort: {{ .Values.ports.mongodb }}
+          volumeMounts:
+            - name: mongo-data
+              mountPath: /data/db
+          envFrom:
+            - configMapRef:
+                name: {{ include "ssm.fullname" . }}-mongodb-connection
+            - secretRef:
+                name: {{ .Values.secrets.db }}
+        {{- if .Values.seaweedfs.enabled }}
+        - name: seaweedfs
+          image: {{ .Values.seaweedfs.image.repository }}:{{ .Values.seaweedfs.image.tag }}
+          ports:
+            - containerPort: {{ .Values.ports.seaweedfs }}
+          volumeMounts:
+            - name: seaweedfs-data
+              mountPath: /data
+          envFrom:
+            - configMapRef:
+                name: {{ include "ssm.fullname" . }}-s3-connection
+            - secretRef:
+                name: {{ .Values.secrets.s3 }}
+          command: [ "/bin/sh", "-c" ]
+          args:
+            - >
+              (
+                sleep 20 &&
+                echo "s3.configure -access_key $S3_ACCESS_KEY -secret_key $S3_SECRET_KEY -user ssm -actions Admin -apply" | weed shell &&
+                echo "s3.bucket.create -name $BUCKET_NAME" | weed shell
+              ) &
+
+              weed server -dir=/data -s3 -s3.port={{ .Values.ports.seaweedfs }}
+        {{- end }}
+      restartPolicy: Always
+      volumes:
+        - name: mongo-data
+          persistentVolumeClaim:
+            claimName: vol-{{ include "ssm.fullname" . }}-mongodb
+        {{- if .Values.seaweedfs.enabled }}
+        - name: seaweedfs-data
+          persistentVolumeClaim:
+            claimName: vol-{{ include "ssm.fullname" . }}-seaweedfs
+        {{- end }}

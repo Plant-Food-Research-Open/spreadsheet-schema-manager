@@ -1,0 +1,75 @@
+pipeline {
+
+    agent { label 'docker' }
+
+    environment {
+        registry = "https://containerhub.pfr.co.nz"
+        registryCredential = "containerhub-spreadsheet-schema-manager-robot"
+        registryNamespace = "spreadsheet-schema-manager"
+        service = "spreadsheet-schema-manager-rio"
+    }
+
+    stages {    
+        
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage ('Create CA certificate file from secret') {
+            steps {
+                withCredentials([file(credentialsId: 'k8s-prod-ca', variable: 'CA_CERT')]) {
+                    sh 'cp "$CA_CERT" ./k8s-prod-ca.crt'
+                }
+                withCredentials([file(credentialsId: 'k8s-dev-ca', variable: 'CA_CERT')]) {
+                    sh 'cp "$CA_CERT" ./k8s-dev-ca.crt'
+                }
+                withCredentials([file(credentialsId: 'pfr-root-ca', variable: 'CA_CERT')]) {
+                    sh 'cp "$CA_CERT" ./pfr-ca.crt'
+                }
+            }
+        }
+
+        stage('Build image') {
+            steps {
+                script {
+                    dockerImage = docker.build(
+                        "${registryNamespace}/${service}-prod:latest",
+                        "--no-cache --pull -f Dockerfile .")
+                }
+            }
+        }
+
+        stage('Run Unit Tests') {
+            steps {
+                script {
+                    docker.image("${registryNamespace}/${service}-prod:latest").inside("-e HOME=${env.WORKSPACE}") {
+                        sh 'python -m xmlrunner'
+                    }
+                }
+            }
+            post {
+                always {
+                    junit '**/TEST-*.xml'
+                }
+            }
+        }
+        
+        stage('Push to ContainerHub') {
+            steps {
+                script {
+                    docker.withRegistry( registry,  registryCredential ) {
+                        dockerImage.push()
+                    }
+                }
+            }
+        }
+    }
+
+    post('Clean workspace') {   
+        always {
+          cleanWs()
+        }
+    }   
+}
