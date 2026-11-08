@@ -1,0 +1,77 @@
+// Template build pipeline: builds the app image, runs the unit tests inside it
+// and pushes it to a container registry.
+//
+// Copy this into your own (private) deployment repo and fill in the values
+// marked TODO. Organisation-specific copies should not be committed here.
+pipeline {
+
+    agent { label 'docker' }
+
+    environment {
+        registry = "https://registry.example.com"             // TODO: registry URL
+        registryCredential = "registry-robot-credential-id"   // TODO: Jenkins username/password credential ID
+        registryNamespace = "spreadsheet-schema-manager"
+        service = "spreadsheet-schema-manager-rio"
+        imageEnv = "prod"                                     // TODO: e.g. dev / uat / prod
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        // Optional: trust internal CAs (e.g. for your identity provider). Each
+        // Jenkins "secret file" credential is copied into certs/ as a .crt.
+        stage ('Create CA certificate files from secrets') {
+            steps {
+                withCredentials([file(credentialsId: 'internal-root-ca', variable: 'CA_CERT')]) {  // TODO: credential ID(s)
+                    sh 'cp "$CA_CERT" ./certs/internal-root-ca.crt'
+                }
+            }
+        }
+
+        stage('Build image') {
+            steps {
+                script {
+                    dockerImage = docker.build(
+                        "${registryNamespace}/${service}-${imageEnv}:latest",
+                        "--no-cache --pull -f Dockerfile .")
+                }
+            }
+        }
+
+        stage('Run Unit Tests') {
+            steps {
+                script {
+                    docker.image("${registryNamespace}/${service}-${imageEnv}:latest").inside("-e HOME=${env.WORKSPACE}") {
+                        sh 'python -m xmlrunner'
+                    }
+                }
+            }
+            post {
+                always {
+                    junit '**/TEST-*.xml'
+                }
+            }
+        }
+
+        stage('Push to registry') {
+            steps {
+                script {
+                    docker.withRegistry( registry,  registryCredential ) {
+                        dockerImage.push()
+                    }
+                }
+            }
+        }
+    }
+
+    post('Clean workspace') {
+        always {
+          cleanWs()
+        }
+    }
+}

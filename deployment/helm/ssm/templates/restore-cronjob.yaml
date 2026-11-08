@@ -17,16 +17,16 @@ spec:
             {{- include "ssm.selectorLabels" . | nindent 12 }}
         spec:
           volumes:
-            - name: powerplant-workspace
+            - name: backup-storage
               nfs:
-                server: {{ .Values.restore.nfs.server }}
-                path: {{ .Values.restore.nfs.path }}
+                server: {{ required "restore.nfs.server is required when restore.enabled" .Values.restore.nfs.server }}
+                path: {{ required "restore.nfs.path is required when restore.enabled" .Values.restore.nfs.path }}
                 readOnly: true
           containers:
             - name: cron-restore
               image: {{ .Values.mongodb.image.repository }}:{{ .Values.mongodb.image.tag }}
               volumeMounts:
-                - name: powerplant-workspace
+                - name: backup-storage
                   mountPath: /backup
                   readOnly: true
               command: [ "/bin/sh", "-c" ]

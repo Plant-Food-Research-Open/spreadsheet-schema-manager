@@ -50,3 +50,6 @@ Thumbs.db
 
 # VS Code
 .vscode/
+
+# Organisation-specific CA certificates (copied in at build time)
+certs/*.crt

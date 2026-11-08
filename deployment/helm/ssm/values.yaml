@@ -1,8 +1,14 @@
+# Generic defaults. Organisation/environment-specific values (image registry,
+# hostnames, storage, NFS backup target, identity provider, ...) belong in your
+# own values overlays, kept outside this repo and passed with `-f`. Values
+# marked REQUIRED have placeholder defaults that must be overridden.
+
 nameOverride: ""
 fullnameOverride: "spreadsheet-schema-manager"
 
 image:
-  repository: containerhub.powerplant.pfr.co.nz/spreadsheet-schema-manager/spreadsheet-schema-manager-rio-prod
+  # REQUIRED: the registry/repository your CI pushes the app image to.
+  repository: registry.example.com/spreadsheet-schema-manager/spreadsheet-schema-manager-rio
   tag: latest
   pullPolicy: Always
 
@@ -18,20 +24,31 @@ mongodb:
     repository: mongo
     tag: 8.3.4-noble
   storage: 100M
-  storageClassName: kubernetes-nfs
+  storageClassName: "" # empty = cluster default StorageClass
 
 ingress:
-  host: spreadsheet-schema-manager.dhs.k8s.pfr.co.nz
+  # REQUIRED: public hostname of the app.
+  host: spreadsheet-schema-manager.example.com
+  className: nginx
+  # cert-manager ClusterIssuer used to provision the TLS cert. Leave empty to
+  # manage the TLS secret yourself.
+  clusterIssuer: ""
   tlsSecretName: ssm-tls-secret
   proxyBodySize: 200M
 
 auth:
   redirectPath: /login
   disabled: false
+  # REQUIRED unless disabled: Keycloak realm URL, e.g.
+  # https://keycloak.example.com/realms/<realm>
+  issuer: ""
+  clientId: spreadsheet-schema
+  # Shown on the login button: "Log in via <providerLabel> SSO".
+  providerLabel: Keycloak
 
 s3:
   url: http://spreadsheet-schema-manager:8333
-  bucketName: spreadsheet-schema-prod
+  bucketName: spreadsheet-schema
 
 # In-pod SeaweedFS S3 gateway.
 seaweedfs:
@@ -40,7 +57,7 @@ seaweedfs:
     repository: chrislusf/seaweedfs
     tag: "4.44"
   storage: 100M
-  storageClassName: kubernetes-nfs
+  storageClassName: "" # empty = cluster default StorageClass
 
 # Secrets are managed outside this chart (ArgoCD / manually created).
 # Only their names are referenced here.
@@ -52,20 +69,23 @@ secrets:
 
 resources: {}
 
+# The backup/restore jobs below read and write archives on an NFS share.
+# nfs.server and nfs.path are REQUIRED when the job is enabled.
+
 backup:
   enabled: false
   schedule: "30 2 * * *"
   nfs:
-    server: storage.powerplant.pfr.co.nz
-    path: /ifs/linux/prod/powerplant/workspace/projects/spreadsheet-schema
+    server: ""
+    path: ""
 
 restore:
   enabled: false
   suspend: true
   schedule: "0 3 * * *"
   nfs:
-    server: storage.powerplant.pfr.co.nz
-    path: /ifs/linux/prod/powerplant/workspace/projects/spreadsheet-schema
+    server: ""
+    path: ""
 
 cleanup:
   enabled: false
@@ -82,8 +102,8 @@ backupS3:
   suspend: true
   schedule: "45 2 * * *"
   nfs:
-    server: storage.powerplant.pfr.co.nz
-    path: /ifs/linux/prod/powerplant/workspace/projects/spreadsheet-schema
+    server: ""
+    path: ""
 
 # Manually-triggered only (suspend: true always) — restores the latest
 # backupS3 archive back into the seaweedfs bucket.
@@ -92,5 +112,5 @@ restoreS3:
   suspend: true
   schedule: "15 3 * * *"
   nfs:
-    server: storage.powerplant.pfr.co.nz
-    path: /ifs/linux/prod/powerplant/workspace/projects/spreadsheet-schema
+    server: ""
+    path: ""

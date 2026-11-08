@@ -17,15 +17,15 @@ spec:
             {{- include "ssm.selectorLabels" . | nindent 12 }}
         spec:
           volumes:
-            - name: powerplant-workspace
+            - name: backup-storage
               nfs:
-                server: {{ .Values.backupS3.nfs.server }}
-                path: {{ .Values.backupS3.nfs.path }}
+                server: {{ required "backupS3.nfs.server is required when backupS3.enabled" .Values.backupS3.nfs.server }}
+                path: {{ required "backupS3.nfs.path is required when backupS3.enabled" .Values.backupS3.nfs.path }}
           containers:
             - name: cron-backup-s3
               image: amazon/aws-cli:latest
               volumeMounts:
-                - name: powerplant-workspace
+                - name: backup-storage
                   mountPath: /backup
               command: [ "/bin/sh", "-c" ]
               envFrom:

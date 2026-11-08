@@ -7,8 +7,9 @@ import rio
 from . import data_models
 
 
-# Keycloak OAuth settings
-ISSUER = os.getenv('AUTH_ISSUER', 'https://keycloak.auth.k8s.pfr.co.nz/realms/PFR')
+# Keycloak OAuth settings. AUTH_ISSUER is the realm URL, e.g.
+# https://keycloak.example.com/realms/<realm> (required unless AUTH_DISABLED).
+ISSUER = os.getenv('AUTH_ISSUER', '').rstrip('/')
 AUTHORIZATION_ENDPOINT = f"{ISSUER}/protocol/openid-connect/auth"
 TOKEN_ENDPOINT = f"{ISSUER}/protocol/openid-connect/token"
 USER_INFO_ENDPOINT = f"{ISSUER}/protocol/openid-connect/userinfo"
@@ -20,7 +21,7 @@ REDIRECT_URI = os.getenv('AUTH_REDIRECT_URI')
 CA_CERT_PATH = os.getenv('REQUESTS_CA_BUNDLE')
 
 # Shown on the login button, e.g. "Log in via {AUTH_PROVIDER_LABEL} SSO".
-AUTH_PROVIDER_LABEL = os.getenv('AUTH_PROVIDER_LABEL', 'PFR')
+AUTH_PROVIDER_LABEL = os.getenv('AUTH_PROVIDER_LABEL', 'Keycloak')
 
 # When set, Keycloak login is bypassed. Each new session is attached its
 # own fresh synthetic AppUser (a new ObjectId every time) - it's never

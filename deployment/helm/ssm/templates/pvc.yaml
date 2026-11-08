@@ -7,7 +7,9 @@ metadata:
   annotations:
     "helm.sh/resource-policy": "keep"
 spec:
-  storageClassName: {{ .Values.mongodb.storageClassName }}
+  {{- with .Values.mongodb.storageClassName }}
+  storageClassName: {{ . }}
+  {{- end }}
   accessModes:
     - ReadWriteOnce
   resources:
@@ -24,7 +26,9 @@ metadata:
   annotations:
     "helm.sh/resource-policy": "keep"
 spec:
-  storageClassName: {{ .Values.seaweedfs.storageClassName }}
+  {{- with .Values.seaweedfs.storageClassName }}
+  storageClassName: {{ . }}
+  {{- end }}
   accessModes:
     - ReadWriteOnce
   resources:

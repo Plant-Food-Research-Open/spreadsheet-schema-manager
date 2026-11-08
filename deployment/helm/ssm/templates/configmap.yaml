@@ -26,6 +26,10 @@ metadata:
     {{- include "ssm.labels" . | nindent 4 }}
 data:
   AUTH_REDIRECT_URI: {{ printf "https://%s%s" .Values.ingress.host .Values.auth.redirectPath | quote }}
+  AUTH_CLIENT_ID: {{ .Values.auth.clientId | quote }}
+  AUTH_PROVIDER_LABEL: {{ .Values.auth.providerLabel | quote }}
   {{- if .Values.auth.disabled }}
   AUTH_DISABLED: "true"
+  {{- else }}
+  AUTH_ISSUER: {{ required "auth.issuer is required unless auth.disabled is true" .Values.auth.issuer | quote }}
   {{- end }}

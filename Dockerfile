@@ -11,12 +11,10 @@ EXPOSE 8000
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
-# Set up CA certificates
-COPY k8s-prod-ca.crt /usr/local/share/ca-certificates
-
-COPY k8s-dev-ca.crt /usr/local/share/ca-certificates
-
-COPY pfr-ca.crt /usr/local/share/ca-certificates
+# Set up CA certificates. Any `*.crt` files placed in `certs/` before the build
+# (e.g. internal root CAs for your identity provider) are trusted. See
+# certs/README.md.
+COPY certs/ /usr/local/share/ca-certificates/
 
 RUN apk add --no-cache ca-certificates \
  && update-ca-certificates
