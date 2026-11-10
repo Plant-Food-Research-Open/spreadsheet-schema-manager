@@ -6,6 +6,7 @@ from spreadsheet_schema_manager_rio import data_models
 from spreadsheet_schema_manager_rio.data_models import StandardisationSwitch
 from spreadsheet_schema_manager_rio.data_utils.data_standardise_utils import (
     check_date_format_reliability,
+    describe_date_order,
     resolve_date_format,
     standardise_date_column,
     standardise_fields,
@@ -80,6 +81,36 @@ class TestStandardiseDateColumn(unittest.TestCase):
         self.assertEqual(actual.tolist(), ["03/04/2024"])
 
 
+class TestDescribeDateOrder(unittest.TestCase):
+    def test_iso_is_unambiguous(self):
+        series = pd.Series(["2026-06-01", "2026-06-02"])
+        self.assertEqual(describe_date_order(series, dayfirst=True), "Unambiguous")
+        self.assertEqual(describe_date_order(series, dayfirst=False), "Unambiguous")
+
+    def test_excel_datetime_text_is_unambiguous(self):
+        # Real Excel dates reach standardisation as "YYYY-MM-DD HH:MM:SS" text.
+        series = pd.Series(["2026-06-01 00:00:00", "2026-06-15 00:00:00"])
+        self.assertEqual(describe_date_order(series, dayfirst=False), "Unambiguous")
+
+    def test_day_first_detected(self):
+        series = pd.Series(["03/04/2024", "25/06/2024"])
+        # The selection is irrelevant when only one reading fits.
+        self.assertEqual(describe_date_order(series, dayfirst=False), "Day first (detected)")
+
+    def test_month_first_detected(self):
+        series = pd.Series(["04/03/2024", "06/25/2024"])
+        self.assertEqual(describe_date_order(series, dayfirst=True), "Month first (detected)")
+
+    def test_ambiguous_reports_selection(self):
+        series = pd.Series(["1/06/2025", "2/06/2025"])
+        self.assertEqual(describe_date_order(series, dayfirst=True), "Day first (selected)")
+        self.assertEqual(describe_date_order(series, dayfirst=False), "Month first (selected)")
+
+    def test_unreliable_and_empty(self):
+        self.assertEqual(describe_date_order(pd.Series(["1/06/2025", "206/2025"]), True), "")
+        self.assertEqual(describe_date_order(pd.Series(["", None]), True), "")
+
+
 class TestStandardiseFields(unittest.TestCase):
     def test_new_date_and_text_fields(self):
         df = pd.DataFrame({
@@ -115,7 +146,7 @@ class TestStandardiseFields(unittest.TestCase):
 
         self.assertEqual(log_df["Original Column"].tolist(), ["Date Column", "Text Column"])
         self.assertEqual(log_df["Field Source"].tolist(), ["New Field", "New Field"])
-        self.assertEqual(log_df["Date Order"].tolist(), ["Day first", ""])
+        self.assertEqual(log_df["Date Order"].tolist(), ["Day first (detected)", ""])
 
     def test_category_value_mappings_are_logged(self):
         df = pd.DataFrame({"Grade": ["A", "B", "A"]})

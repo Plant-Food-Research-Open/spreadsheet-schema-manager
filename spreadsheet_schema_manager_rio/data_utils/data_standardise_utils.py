@@ -99,6 +99,39 @@ def check_date_format_reliability(series: pd.Series) -> tuple[bool, bool, bool |
     return is_reliable, is_ambiguous, dayfirst
 
 
+def describe_date_order(series: pd.Series, dayfirst: bool) -> str:
+    """
+    Describes, for the StandardisationLog, how this Date column's day/month
+    order was decided. Must be called on the original (pre-standardisation)
+    values.
+
+    - "Unambiguous": the format has no day/month question to answer (ISO /
+      year-first values, including real Excel dates), so `dayfirst` played no
+      part.
+    - "Day first (detected)" / "Month first (detected)": only one reading
+      fits the whole column.
+    - "Day first (selected)" / "Month first (selected)": both readings fit,
+      so the order is the one the user picked.
+    - "": the column isn't reliably parseable and is left unchanged.
+    """
+    non_empty = _non_empty_values(series)
+    if non_empty.empty:
+        return ""
+
+    month_first_format, day_first_format = _guess_date_format_variants(str(non_empty.iloc[0]))
+    if month_first_format is None:
+        return ""
+    if month_first_format == day_first_format:
+        return "Unambiguous" if _format_parses_whole_series(non_empty, month_first_format) else ""
+
+    is_reliable, is_ambiguous, detected_dayfirst = check_date_format_reliability(series)
+    if not is_reliable:
+        return ""
+    if is_ambiguous:
+        return f"{'Day' if dayfirst else 'Month'} first (selected)"
+    return f"{'Day' if detected_dayfirst else 'Month'} first (detected)"
+
+
 def standardise_date_column(series: pd.Series, date_format: str, dayfirst: bool = True) -> pd.Series:
     """
     Reformats a Date column's values to the given strftime format. Columns
@@ -224,8 +257,8 @@ def standardise_fields(
         date_order = ""
         if isinstance(mapped_field, data_models.Date):
             dayfirst = all_date_dayfirst_selections.get(header, True)
+            date_order = describe_date_order(df_std[header], dayfirst)
             df_std[header] = standardise_date_column(df_std[header], date_format, dayfirst)
-            date_order = "Day first" if dayfirst else "Month first"
 
         log_rows.append({
             COL_ORIGINAL_COLUMN: header,
