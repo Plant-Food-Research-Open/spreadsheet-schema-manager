@@ -11,6 +11,14 @@ class ReleaseNote:
 # Newest release first.
 RELEASE_NOTES: list[ReleaseNote] = [
     ReleaseNote(
+        version="1.0.0",
+        date="2026-11-11",
+        changes=[
+            "First open-source release, with documentation at https://spreadsheet-schema-manager.readthedocs.io",
+            "Datasets: the StandardisationLog's \"Date order\" now records whether each Date column's day/month order was unambiguous, detected, or selected by you",
+        ],
+    ),
+    ReleaseNote(
         version="0.24",
         date="2026-07-29",
         changes=[
