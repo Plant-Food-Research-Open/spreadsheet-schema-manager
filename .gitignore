@@ -53,3 +53,7 @@ Thumbs.db
 
 # Organisation-specific CA certificates (copied in at build time)
 certs/*.crt
+
+# Sphinx docs
+docs/_build/
+docs/source/about/release-notes.md
