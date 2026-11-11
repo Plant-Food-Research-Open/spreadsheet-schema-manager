@@ -6,5 +6,4 @@
 field-types
 workbook-anatomy
 field-import-format
-input-files
 ```

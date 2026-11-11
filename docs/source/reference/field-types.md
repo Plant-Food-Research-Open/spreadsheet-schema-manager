@@ -40,8 +40,3 @@ A plain number with no unit, such as a replicate or plot number.
 
 A calendar date. Dates are standardised to ISO format (`YYYY-MM-DD`). When a Dataset's dates
 could be read either day-first or month-first, SSM asks which one is meant.
-
-:::{admonition} Draft
-:class: warning
-To add: how each type is validated in a generated Workbook.
-:::
